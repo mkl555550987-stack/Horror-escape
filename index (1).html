@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#08090a">
+<title>Horror Escape</title>
+<style>
+  :root{color-scheme:dark;--ink:#e8e5dc;--muted:#96958f;--blood:#b33132;--glass:rgba(9,11,12,.72);--line:rgba(226,221,206,.13);--danger:0}
+  *{box-sizing:border-box}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#050607;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;user-select:none;-webkit-user-select:none}
+  button{font:inherit;color:inherit}
+  #game{position:relative;width:100%;height:100%;height:100dvh;overflow:hidden;background:#050607;isolation:isolate}
+  #view{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:auto;touch-action:none;outline:none}
+  #grade{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 46%,transparent 30%,rgba(0,0,0,.23) 70%,rgba(0,0,0,.76) 125%),linear-gradient(180deg,rgba(0,0,0,.17),transparent 24%,transparent 72%,rgba(0,0,0,.34));mix-blend-mode:multiply}
+  #scanlines{position:absolute;inset:0;pointer-events:none;opacity:.14;background:repeating-linear-gradient(180deg,transparent 0,transparent 3px,rgba(0,0,0,.17) 4px);}
+  #dangerVignette{position:absolute;inset:-4%;pointer-events:none;opacity:var(--danger);background:radial-gradient(ellipse at center,transparent 23%,rgba(82,4,8,.18) 54%,rgba(108,0,8,.52) 100%);transition:opacity .2s}
+  .hud{position:absolute;z-index:3;pointer-events:none}
+  .topbar{top:20px;left:22px;right:22px;display:flex;align-items:center;gap:16px}
+  .brand,.objective-card,.key-card,.sound-button,.flash-card,.hint-card,.timer-card{background:var(--glass);border:1px solid var(--line);box-shadow:0 10px 38px rgba(0,0,0,.23);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  .brand{height:58px;min-width:206px;padding:9px 15px 9px 10px;display:flex;align-items:center;gap:11px;border-radius:4px}
+  .brand-mark{width:36px;height:36px;display:grid;place-items:center;position:relative;background:linear-gradient(135deg,#4a1d1f,#181113);border:1px solid rgba(190,86,82,.42);color:#e4c9be;font-size:14px;font-weight:800;letter-spacing:-.08em}
+  .brand-mark:after{content:"";position:absolute;right:-1px;bottom:-1px;width:8px;height:8px;background:#a63436;clip-path:polygon(100% 0,100% 100%,0 100%)}
+  .brand-name{font-size:11px;font-weight:800;letter-spacing:.19em;white-space:nowrap}
+  .brand-sub{margin-top:4px;font-size:9px;color:#a09e96;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
+  .objective-card{height:58px;min-width:220px;padding:9px 16px;border-radius:4px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+  .eyebrow{font-size:8px;line-height:1;color:#9e9b91;letter-spacing:.2em;text-transform:uppercase}
+  .objective-text{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+  .top-spacer{flex:1}
+  .timer-card,.key-card{height:48px;border-radius:4px;display:flex;align-items:center;gap:9px;padding:0 13px;font-size:10px;letter-spacing:.11em;text-transform:uppercase}
+  .timer-card{color:#c7c3b8;font-variant-numeric:tabular-nums;min-width:82px;justify-content:center}
+  .key-glyph{width:17px;height:17px;color:#aaa69a}
+  .key-card strong{font-size:9px;font-weight:700;color:#a5a198}
+  .key-card.found{border-color:rgba(201,166,87,.38);color:#e4c887}
+  .key-card.found strong{color:#e4c887}
+  .sound-button{pointer-events:auto;width:46px;height:46px;padding:0;display:grid;place-items:center;border-radius:4px;color:#d5d0c6;cursor:pointer;transition:background .18s,border-color .18s,transform .18s}
+  .sound-button:hover{background:rgba(45,47,45,.85);border-color:rgba(225,220,206,.3)}
+  .sound-button:active{transform:scale(.96)}
+  .sound-button svg{width:17px;height:17px}
+  .bottom-left{left:22px;bottom:20px;display:flex;align-items:flex-end;gap:10px}
+  .flash-card{min-width:176px;height:58px;border-radius:4px;padding:10px 13px;display:grid;grid-template-columns:34px 1fr;grid-template-rows:1fr 12px;column-gap:10px;align-items:center}
+  .flash-icon{grid-row:1 / 3;width:32px;height:32px;border:1px solid rgba(228,220,193,.2);display:grid;place-items:center;border-radius:50%;color:#d9cda5;position:relative}
+  .flash-icon:before{content:"";position:absolute;inset:5px;border:1px solid currentColor;border-radius:50%;opacity:.55}
+  .flash-icon svg{width:13px;height:13px;z-index:1}
+  .flash-label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#d8d3c8;font-weight:700;align-self:end}
+  .flash-state{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:#a4a095;align-self:start;margin-top:3px}
+  .flash-card.off .flash-icon{color:#77756e;border-color:rgba(150,145,130,.12)}
+  .flash-card.off .flash-icon:before{opacity:.15}
+  .stamina{display:flex;flex-direction:column;justify-content:center;height:58px;min-width:132px;padding:10px 12px;border-radius:4px}
+  .stamina-head{display:flex;justify-content:space-between;align-items:center;font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#aaa79d}
+  .meter{height:3px;margin-top:12px;background:rgba(220,215,202,.13);overflow:hidden}
+  .meter-fill{height:100%;width:100%;background:#c9b982;transition:width .12s linear,background .2s}
+  .hint-card{right:22px;bottom:20px;min-width:224px;padding:12px 15px;border-radius:4px;text-align:right}
+  .hint-card .eyebrow{margin-bottom:7px}
+  .hint-line{font-size:9px;line-height:1.7;letter-spacing:.08em;color:#c5c1b7;text-transform:uppercase}
+  kbd{display:inline-block;min-width:18px;padding:2px 4px;margin-right:3px;text-align:center;border:1px solid rgba(230,224,210,.24);border-radius:2px;background:rgba(255,255,255,.045);font:700 8px/1.1 inherit;color:#e9e5db}
+  #crosshair{position:absolute;z-index:2;left:50%;top:50%;width:12px;height:12px;transform:translate(-50%,-50%);pointer-events:none;opacity:.58;transition:opacity .15s}
+  #crosshair:before,#crosshair:after{content:"";position:absolute;left:50%;top:50%;background:rgba(231,226,211,.86);transform:translate(-50%,-50%);box-shadow:0 0 5px rgba(0,0,0,.9)}
+  #crosshair:before{width:1px;height:9px}#crosshair:after{width:9px;height:1px}
+  #interact{position:absolute;z-index:4;left:50%;bottom:116px;transform:translate(-50%,9px);padding:11px 16px;background:rgba(8,10,10,.82);border:1px solid rgba(224,216,196,.18);border-radius:3px;box-shadow:0 7px 25px rgba(0,0,0,.3);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .16s,transform .16s;color:#e3dfd3}
+  #interact.show{opacity:1;transform:translate(-50%,0)}
+  #interact .action-key{display:inline-grid;place-items:center;margin-right:8px;width:21px;height:21px;border:1px solid rgba(226,218,198,.32);border-radius:2px;color:#efe8d4}
+  #interact.locked{color:#c4aaa0;border-color:rgba(158,71,63,.32)}
+  #toast{position:absolute;z-index:6;top:104px;left:50%;transform:translate(-50%,-8px);max-width:min(88vw,560px);padding:10px 15px;border:1px solid rgba(220,214,199,.17);background:rgba(7,9,9,.82);color:#ded9cc;font-size:10px;letter-spacing:.15em;text-transform:uppercase;text-align:center;opacity:0;pointer-events:none;transition:opacity .22s,transform .22s}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  #toast.alert{border-color:rgba(156,43,46,.48);color:#e2b1a6}
+  #presence{position:absolute;z-index:3;top:91px;right:23px;padding:7px 10px;color:#d29088;background:rgba(32,7,8,.48);border:1px solid rgba(142,41,43,.22);font-size:8px;letter-spacing:.19em;text-transform:uppercase;opacity:0;transform:translateY(-3px);transition:opacity .2s,transform .2s;pointer-events:none}
+  #presence.show{opacity:1;transform:translateY(0)}
+  #presence:before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:#bb4542;margin:0 7px 1px 0;box-shadow:0 0 10px #c33836;animation:pulse 1.2s infinite}
+  @keyframes pulse{50%{opacity:.35;transform:scale(.7)}}
+  .screen{position:absolute;z-index:10;inset:0;display:grid;place-items:center;padding:24px;background:rgba(4,5,6,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:1;visibility:visible;transition:opacity .32s,visibility .32s}
+  .screen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+  .panel{width:min(100%,580px);position:relative;padding:clamp(26px,5vw,50px);background:linear-gradient(135deg,rgba(20,22,22,.96),rgba(8,10,11,.96));border:1px solid rgba(221,214,198,.17);box-shadow:0 30px 120px rgba(0,0,0,.58)}
+  .panel:before{content:"";position:absolute;left:-1px;top:25px;bottom:25px;width:2px;background:linear-gradient(180deg,transparent,#a73b3c 30%,#652426 80%,transparent)}
+  .panel:after{content:"";position:absolute;right:0;top:0;width:36px;height:36px;border-top:1px solid rgba(202,165,132,.32);border-right:1px solid rgba(202,165,132,.32)}
+  .panel-kicker{display:flex;align-items:center;gap:9px;color:#c1716e;font-size:9px;font-weight:700;letter-spacing:.24em;text-transform:uppercase}
+  .panel-kicker:before{content:"";width:20px;height:1px;background:#a63c3c}
+  h1,h2,p{margin:0}
+  .title{margin:20px 0 12px;font-size:clamp(43px,9vw,76px);line-height:.88;font-weight:850;letter-spacing:-.065em;text-transform:uppercase}
+  .title span{display:block;color:#d2cfc4}
+  .title span+span{margin-top:7px;color:#a43a3c;text-shadow:0 0 28px rgba(143,38,42,.2)}
+  .panel-copy{max-width:420px;margin-top:18px;color:#aaa89f;font-size:13px;line-height:1.75}
+  .panel-copy strong{color:#e1ded3;font-weight:600}
+  .primary-button{margin-top:27px;width:100%;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 17px;border:1px solid rgba(198,85,79,.6);border-radius:2px;background:linear-gradient(90deg,#762b2d,#4a2021);color:#f1e8dc;font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;transition:filter .18s,transform .18s,border-color .18s}
+  .primary-button:hover{filter:brightness(1.18);border-color:rgba(229,121,111,.85);transform:translateY(-1px)}
+  .primary-button:active{transform:translateY(0)}
+  .primary-button .arrow{font-size:20px;font-weight:400;line-height:1}
+  .control-strip{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;padding-top:17px;border-top:1px solid rgba(225,220,205,.1)}
+  .control-item{display:flex;align-items:center;gap:8px;color:#908f88;font-size:9px;letter-spacing:.09em;text-transform:uppercase}
+  .control-item .control-icon{width:25px;height:25px;display:grid;place-items:center;border:1px solid rgba(221,216,202,.15);color:#d1cbbc;font-size:9px;font-weight:700}
+  .panel-foot{display:flex;justify-content:space-between;gap:10px;margin-top:21px;color:#676963;font-size:8px;letter-spacing:.15em;text-transform:uppercase}
+  .result-symbol{width:50px;height:50px;margin:23px 0 8px;display:grid;place-items:center;border:1px solid rgba(188,148,102,.25);color:#c5a877;border-radius:50%;font-size:19px}
+  .result-title{font-size:clamp(34px,7vw,55px);line-height:.95;letter-spacing:-.055em;text-transform:uppercase}
+  .result-title.lose{color:#c06c67}.result-title.win{color:#c7b381}
+  .result-stats{margin-top:18px;color:#8f9089;font-size:9px;letter-spacing:.16em;text-transform:uppercase}
+  .screen .small-button{margin-top:24px;width:auto;min-width:190px;height:46px}
+  #pauseScreen .panel{width:min(100%,440px);text-align:center}
+  #pauseScreen .panel:before{display:none}
+  #pauseScreen .panel-kicker{justify-content:center}
+  #pauseScreen .title{font-size:50px;margin-top:23px}
+  #pauseScreen .panel-copy{margin:12px auto 0}
+  #touchControls{display:none;position:absolute;z-index:5;left:0;right:0;bottom:18px;height:155px;padding:0 18px;align-items:flex-end;justify-content:space-between;pointer-events:none;touch-action:none}
+  #touchControls.active{display:flex}
+  #touchPad{pointer-events:auto;position:relative;width:116px;height:116px;border:1px solid rgba(231,224,208,.22);border-radius:50%;background:rgba(5,7,8,.35);touch-action:none;box-shadow:inset 0 0 22px rgba(0,0,0,.3)}
+  #touchPad:before,#touchPad:after{content:"";position:absolute;background:rgba(231,224,208,.12)}
+  #touchPad:before{width:1px;height:100%;left:50%;top:0}#touchPad:after{height:1px;width:100%;top:50%;left:0}
+  #thumb{position:absolute;width:44px;height:44px;left:35px;top:35px;border:1px solid rgba(234,227,209,.48);border-radius:50%;background:rgba(211,196,161,.17);pointer-events:none;box-shadow:0 4px 12px #0008}
+  .touch-actions{display:flex;gap:9px;pointer-events:auto}
+  .touch-actions button{width:59px;height:59px;border:1px solid rgba(227,218,196,.25);border-radius:50%;background:rgba(6,8,9,.66);color:#e4ddce;font-size:8px;font-weight:800;letter-spacing:.08em;touch-action:none}
+  .touch-actions button:active{background:rgba(120,44,44,.65)}
+  @media(max-width:700px){
+    .topbar{top:12px;left:12px;right:12px;gap:7px;flex-wrap:wrap}
+    .brand{min-width:0;width:auto;height:48px;padding:7px 9px;gap:8px}.brand-mark{width:31px;height:31px}.brand-name{font-size:9px;letter-spacing:.13em}.brand-sub{font-size:7px;letter-spacing:.1em}
+    .objective-card{height:48px;min-width:0;flex:1;padding:7px 9px}.objective-text{font-size:9px;letter-spacing:.06em}.eyebrow{font-size:7px}
+    .top-spacer{display:none}.timer-card{height:38px;min-width:59px;padding:0 7px;font-size:8px}.key-card{height:38px;gap:5px;padding:0 7px;font-size:8px}.key-card strong{font-size:7px}.key-glyph{width:14px;height:14px}.sound-button{width:38px;height:38px}
+    .bottom-left{left:12px;bottom:13px;gap:7px}.flash-card{min-width:134px;height:48px;padding:7px 9px;grid-template-columns:28px 1fr;column-gap:7px}.flash-icon{width:27px;height:27px}.flash-label{font-size:8px}.flash-state{font-size:7px}.stamina{display:none}
+    .hint-card{display:none}.bottom-left{bottom:14px}.flash-card{margin-bottom:0}
+    #interact{bottom:175px;font-size:9px;padding:9px 12px}
+    #toast{top:100px;font-size:8px;letter-spacing:.1em}
+    #presence{top:105px;right:12px}
+    .panel{padding:28px 23px}.panel-copy{font-size:12px}.control-strip{gap:8px}.control-item{font-size:8px}
+  }
+  @media(max-height:520px) and (min-width:701px){.topbar{top:10px}.bottom-left,.hint-card{bottom:10px}.brand,.objective-card{height:48px}.panel{padding:22px 30px}.title{font-size:50px;margin:13px 0}.panel-copy{margin-top:10px}.primary-button{margin-top:15px;height:45px}.control-strip{margin-top:12px;padding-top:10px}}
+  @media(pointer:coarse){#crosshair{opacity:.24}.bottom-left{bottom:160px}#interact{bottom:164px}}
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="view" aria-label="Horror Escape first-person game"></canvas>
+  <div id="grade"></div><div id="scanlines"></div><div id="dangerVignette"></div>
+
+  <div class="hud topbar">
+    <div class="brand"><div class="brand-mark">H</div><div><div class="brand-name">HORROR ESCAPE</div><div class="brand-sub">The old house · 03:17 AM</div></div></div>
+    <div class="objective-card"><span class="eyebrow">Current objective</span><span class="objective-text" id="objectiveText">Find the old key</span></div>
+    <div class="top-spacer"></div>
+    <div class="timer-card"><span id="timer">00:00</span></div>
+    <div class="key-card" id="keyCard"><svg class="key-glyph" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="8" cy="9" r="4.2" stroke="currentColor" stroke-width="1.5"/><path d="M11 12l8.5 8.5m-3.2-3.2 2.1-2.1m-4.6-.4 2.1-2.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><strong id="keyLabel">KEY MISSING</strong></div>
+    <button class="sound-button" id="soundButton" aria-label="Toggle sound" title="Toggle sound">
+      <svg id="soundIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 9a4 4 0 0 1 0 6m2.5-8a7.5 7.5 0 0 1 0 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <div class="hud bottom-left">
+    <div class="flash-card" id="flashCard"><div class="flash-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 3h8l-1 5 3 4v2H6v-2l3-4-1-5Zm1 14h6m-5 3h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span class="flash-label">Flashlight <kbd>F</kbd></span><span class="flash-state" id="flashState">Beam on</span></div>
+    <div class="stamina flash-card"><div class="stamina-head"><span>Stamina</span><span id="staminaNumber">100%</span></div><div class="meter"><div class="meter-fill" id="staminaFill"></div></div></div>
+  </div>
+  <div class="hud hint-card"><div class="eyebrow">Stay quiet. Keep moving.</div><div class="hint-line"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move &nbsp;·&nbsp; Mouse Look</div><div class="hint-line"><kbd>SHIFT</kbd> Sprint &nbsp;·&nbsp; <kbd>E</kbd> Interact</div></div>
+  <div id="crosshair"></div>
+  <div id="interact"><span class="action-key">E</span><span id="interactText">Interact</span></div>
+  <div id="toast"></div>
+  <div id="presence">Something is roaming</div>
+
+  <div id="touchControls">
+    <div id="touchPad" aria-label="Move control"><div id="thumb"></div></div>
+    <div class="touch-actions"><button id="touchFlash">LIGHT</button><button id="touchUse">USE</button></div>
+  </div>
+
+  <section class="screen" id="titleScreen">
+    <div class="panel">
+      <div class="panel-kicker">A short survival horror</div>
+      <h1 class="title"><span>Horror</span><span>Escape</span></h1>
+      <p class="panel-copy">You wake in a house that should have been empty. <strong>Find the old key, unlock the front door, and get out.</strong> Something is moving in the dark.</p>
+      <button class="primary-button" id="startButton"><span>Enter the house</span><span class="arrow">→</span></button>
+      <div class="control-strip">
+        <div class="control-item"><span class="control-icon">W A S D</span><span>Move</span></div>
+        <div class="control-item"><span class="control-icon">MOUSE</span><span>Look around</span></div>
+        <div class="control-item"><span class="control-icon">E</span><span>Pick up / use</span></div>
+        <div class="control-item"><span class="control-icon">F</span><span>Flashlight</span></div>
+      </div>
+      <div class="panel-foot"><span>3 rooms · one way out</span><span>Headphones recommended</span></div>
+    </div>
+  </section>
+
+  <section class="screen hidden" id="pauseScreen">
+    <div class="panel">
+      <div class="panel-kicker">Take a breath</div>
+      <h2 class="title"><span>Paused</span></h2>
+      <p class="panel-copy">The house is still waiting. Click below when you're ready.</p>
+      <button class="primary-button" id="resumeButton"><span>Return to the house</span><span class="arrow">→</span></button>
+      <div class="panel-foot"><span>WASD move</span><span>Esc pause</span></div>
+    </div>
+  </section>
+
+  <section class="screen hidden" id="resultScreen">
+    <div class="panel">
+      <div class="panel-kicker" id="resultKicker">Case file closed</div>
+      <div class="result-symbol" id="resultSymbol">✦</div>
+      <h2 class="result-title" id="resultTitle">You escaped</h2>
+      <p class="panel-copy" id="resultCopy">The door shuts behind you. For now, you're safe.</p>
+      <div class="result-stats" id="resultStats">Time in the house · 00:00</div>
+      <button class="primary-button small-button" id="retryButton"><span>Play again</span><span class="arrow">↻</span></button>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // A compact, self-contained first-person raycaster: no downloads, libraries, or assets required.
+  const canvas = document.getElementById('view');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const W = 640, H = 360, FLOOR_W = 320;
+  canvas.width = W; canvas.height = H;
+  const floorCanvas = document.createElement('canvas');
+  floorCanvas.width = FLOOR_W; floorCanvas.height = H;
+  const floorCtx = floorCanvas.getContext('2d', { alpha: false });
+  const floorImage = floorCtx.createImageData(FLOOR_W, H);
+  const pixels = floorImage.data;
+  const FOV = 74 * Math.PI / 180, TAN_HALF = Math.tan(FOV / 2);
+  const FOCAL = W / (2 * TAN_HALF), MAP_W = 24, MAP_H = 19;
+  const WALL = 1, CRATE = 2, MAIN_DOOR = 3;
+
+  // Three rooms joined by one short central hall.
+  const world = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(WALL));
+  function carve(x1, y1, x2, y2) {
+    for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) world[y][x] = 0;
+  }
+  carve(1, 3, 8, 15);        // entrance room
+  carve(8, 8, 13, 10);       // cross hall
+  carve(11, 5, 13, 13);      // north/south hall
+  carve(14, 2, 22, 7);       // north room
+  carve(14, 11, 22, 16);     // hidden-key room
+  // A few solid pieces of old furniture break up sight lines without blocking routes.
+  [[6,6],[4,14],[18,4],[20,5],[19,14],[16,15]].forEach(([x,y]) => world[y][x] = CRATE);
+
+  const player = { x: 4.55, y: 9.5, angle: Math.PI };
+  const keyItem = { x: 21.0, y: 15.25 };
+  const door = { x: 0.5, y: 9.5 };
+  const spawns = [
+    {x:12.5,y:6.5}, {x:17.4,y:5.6}, {x:12.5,y:12.5},
+    {x:17.3,y:12.5}, {x:21.3,y:6.2}, {x:21.4,y:15.2}
+  ];
+  const roomFloor = [
+    [58,54,44],   // entry: old oak
+    [43,54,55],   // north: damp blue-green
+    [60,42,41],   // south: faded red
+    [49,45,39]    // halls
+  ];
+  const roomCeiling = [[24,25,22],[18,23,24],[25,18,19],[21,20,18]];
+  const tileNoise = new Float32Array(MAP_W * MAP_H);
+  for (let i=0;i<tileNoise.length;i++) tileNoise[i] = .84 + (((i * 9301 + 49297) % 233) / 233) * .22;
+
+  let doorUnlocked = false, keyFound = false, keyHintShown = false, flashlightOn = true;
+  let started = false, paused = false, terminal = '', elapsed = 0, stamina = 100, staminaDelay = 0;
+  let soundOn = true, audioCtx = null, masterGain = null, ambientStarted = false;
+  let lastFrame = 0, toastTimer = 0, nextCreak = 13;
+  let pointerLocked = false, everPointerLocked = false, fallbackDrag = false, lastMouseX = 0;
+  let touchLookId = null, touchLookX = 0;
+  const touchMove = { forward: 0, strafe: 0 };
+  const keysDown = Object.create(null);
+
+  const monster = {
+    active:false, x:0, y:0, waypoint:null, spawnAt:0, materializeUntil:0,
+    nextPathAt:0, stunnedUntil:0, wasLit:false, lastStunNotice:-10, nextSpawnAt:13
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const ui = {
+    title:$('titleScreen'), pause:$('pauseScreen'), result:$('resultScreen'),
+    objective:$('objectiveText'), keyCard:$('keyCard'), keyLabel:$('keyLabel'), timer:$('timer'),
+    flashCard:$('flashCard'), flashState:$('flashState'), staminaFill:$('staminaFill'),
+    staminaNumber:$('staminaNumber'), interact:$('interact'), interactText:$('interactText'),
+    toast:$('toast'), presence:$('presence'), danger:$('dangerVignette'),
+    touchControls:$('touchControls')
+  };
+
+  const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+  const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  const distance = (ax,ay,bx,by) => Math.hypot(bx-ax,by-ay);
+  const rand = (a,b) => a + Math.random()*(b-a);
+
+  function tileAt(x,y) {
+    if (x === 0 && y === 9) return doorUnlocked ? 0 : MAIN_DOOR;
+    // A short, invisible porch exists only beyond the opened front door.
+    if (doorUnlocked && y === 9 && x < 0 && x >= -2) return 0;
+    if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return WALL;
+    return world[y][x];
+  }
+  function solidAtWorld(x,y) { return tileAt(Math.floor(x),Math.floor(y)) !== 0; }
+  function canStand(x,y,r=.19) {
+    return !solidAtWorld(x-r,y-r) && !solidAtWorld(x+r,y-r) &&
+           !solidAtWorld(x-r,y+r) && !solidAtWorld(x+r,y+r);
+  }
+  function roomAt(x,y) {
+    if (x <= 8 && y >= 3 && y <= 15) return 0;
+    if (x >= 14 && y <= 7) return 1;
+    if (x >= 14 && y >= 11) return 2;
+    return 3;
+  }
+  function canSee(ax,ay,bx,by) {
+    const d = distance(ax,ay,bx,by), steps = Math.max(2,Math.ceil(d*13));
+    for (let i=1;i<steps;i++) {
+      const t=i/steps;
+      if (solidAtWorld(ax+(bx-ax)*t, ay+(by-ay)*t)) return false;
+    }
+    return true;
+  }
+
+  // Procedural wall materials keep the build fully offline and small.
+  function seededRandom(seed) {
+    let s = seed >>> 0;
+    return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  }
+  const wallPalettes = [
+    {top:'#6b6a58',mid:'#555648',lower:'#4b4034',trim:'#292a24',glaze:'#918568'},
+    {top:'#536568',mid:'#405152',lower:'#3c4140',trim:'#242d2c',glaze:'#788985'},
+    {top:'#745655',mid:'#594342',lower:'#4b3635',trim:'#2b2324',glaze:'#a07970'},
+    {top:'#62584b',mid:'#4d463d',lower:'#443a31',trim:'#262522',glaze:'#8b775e'}
+  ];
+  function makeWallTexture(room,variant) {
+    const c=document.createElement('canvas'); c.width=128; c.height=256;
+    const g=c.getContext('2d'), p=wallPalettes[room], r=seededRandom(7301+room*97+variant*311);
+    const grad=g.createLinearGradient(0,0,128,0);
+    grad.addColorStop(0,p.trim); grad.addColorStop(.12,p.top); grad.addColorStop(.5,p.mid); grad.addColorStop(.87,p.top); grad.addColorStop(1,p.trim);
+    g.fillStyle=grad; g.fillRect(0,0,128,256);
+    // Soft grime, cracks, and vertical plaster variation.
+    for(let i=0;i<34;i++){
+      const x=r()*128,y=r()*205,rx=3+r()*16,ry=4+r()*25;
+      g.fillStyle=`rgba(${r()>.5?'12,12,10':'190,178,145'},${.018+r()*.065})`;
+      g.beginPath();g.ellipse(x,y,rx,ry,r()*Math.PI,0,Math.PI*2);g.fill();
+    }
+    for(let x=5;x<128;x+=29+r()*12){
+      g.fillStyle='rgba(12,12,10,.17)';g.fillRect(x,0,2+r()*2,256);
+      g.fillStyle='rgba(223,210,178,.055)';g.fillRect(x+3,0,1,210);
+    }
+    // Painted wainscot and a worn timber rail.
+    g.fillStyle=p.lower;g.fillRect(0,190,128,66);
+    for(let x=0;x<128;x+=32){
+      g.fillStyle='rgba(0,0,0,.15)';g.fillRect(x,198,2,58);
+      g.fillStyle='rgba(220,195,151,.045)';g.fillRect(x+3,202,1,48);
+    }
+    g.fillStyle=p.trim;g.fillRect(0,187,128,5);g.fillRect(0,193,128,2);
+    g.fillStyle=p.glaze;g.globalAlpha=.25;g.fillRect(0,187,128,1);g.globalAlpha=1;
+    // Random hairline cracks.
+    g.strokeStyle='rgba(15,15,13,.38)';g.lineWidth=1;
+    for(let i=0;i<5;i++){
+      let x=8+r()*112,y=22+r()*143;g.beginPath();g.moveTo(x,y);
+      for(let j=0;j<3;j++){x+=(r()-.5)*12;y+=5+r()*12;g.lineTo(x,y)}g.stroke();
+    }
+    // Aged nail heads.
+    g.fillStyle='rgba(205,190,157,.2)';
+    [[8,15],[119,15],[8,185],[119,185]].forEach(([x,y])=>{g.beginPath();g.arc(x,y,1.2,0,Math.PI*2);g.fill()});
+    return c;
+  }
+  function makeDoorTexture() {
+    const c=document.createElement('canvas');c.width=128;c.height=256;const g=c.getContext('2d');
+    const grad=g.createLinearGradient(0,0,128,0);grad.addColorStop(0,'#171513');grad.addColorStop(.1,'#4b3024');grad.addColorStop(.5,'#603d2b');grad.addColorStop(.9,'#472d23');grad.addColorStop(1,'#171513');
+    g.fillStyle=grad;g.fillRect(0,0,128,256);
+    g.fillStyle='#211a16';g.fillRect(7,7,114,242);
+    g.fillStyle='#64452e';g.fillRect(13,12,102,232);
+    for(let x=16;x<116;x+=24){
+      g.fillStyle='rgba(15,10,8,.28)';g.fillRect(x,14,3,226);
+      g.fillStyle='rgba(226,184,124,.07)';g.fillRect(x+4,14,1,226);
+      for(let j=0;j<4;j++){g.fillStyle='rgba(12,9,8,.22)';g.fillRect(x+6,25+j*52,13,2)}
+    }
+    g.strokeStyle='#30231b';g.lineWidth=5;
+    g.strokeRect(22,24,82,82);g.strokeRect(22,129,82,88);
+    g.strokeStyle='rgba(177,133,83,.27)';g.lineWidth=1;g.strokeRect(25,27,76,76);g.strokeRect(25,132,76,82);
+    g.fillStyle='#1e1e1b';g.fillRect(13,116,102,8);g.fillStyle='#92754d';g.fillRect(14,117,100,2);
+    // Old iron lock and a small ring pull.
+    g.fillStyle='#181716';g.fillRect(89,137,16,25);g.strokeStyle='#9b8355';g.lineWidth=2;g.strokeRect(90,138,14,23);
+    g.beginPath();g.arc(97,145,3,Math.PI,0);g.stroke();g.beginPath();g.arc(97,153,2,0,Math.PI*2);g.fillStyle='#c0a16a';g.fill();
+    g.fillStyle='rgba(210,182,129,.42)';g.fillRect(18,11,92,2);g.fillRect(18,243,92,2);
+    const r=seededRandom(411);g.strokeStyle='rgba(12,8,7,.32)';g.lineWidth=1;
+    for(let i=0;i<18;i++){let x=14+r()*100,y=16+r()*224;g.beginPath();g.moveTo(x,y);g.lineTo(x+(r()-.5)*8,y+3+r()*14);g.stroke()}
+    return c;
+  }
+  function makeCrateTexture() {
+    const c=document.createElement('canvas');c.width=128;c.height=256;const g=c.getContext('2d');
+    const gr=g.createLinearGradient(0,0,128,0);gr.addColorStop(0,'#211a15');gr.addColorStop(.15,'#59402d');gr.addColorStop(.5,'#715137');gr.addColorStop(.88,'#493425');gr.addColorStop(1,'#1c1713');
+    g.fillStyle=gr;g.fillRect(0,0,128,256);
+    g.fillStyle='rgba(12,9,7,.3)';g.fillRect(0,0,128,13);g.fillRect(0,238,128,18);
+    for(let y=20;y<236;y+=48){g.fillStyle='rgba(15,10,8,.27)';g.fillRect(0,y,128,3);g.fillStyle='rgba(213,177,127,.12)';g.fillRect(0,y+4,128,1)}
+    g.strokeStyle='rgba(28,18,12,.8)';g.lineWidth=10;g.beginPath();g.moveTo(14,22);g.lineTo(114,232);g.moveTo(114,22);g.lineTo(14,232);g.stroke();
+    g.strokeStyle='rgba(184,139,88,.32)';g.lineWidth=2;g.beginPath();g.moveTo(14,22);g.lineTo(114,232);g.moveTo(114,22);g.lineTo(14,232);g.stroke();
+    g.fillStyle='#99744d';[[12,18],[110,18],[12,232],[110,232]].forEach(([x,y])=>{g.fillRect(x,y,6,6)});
+    return c;
+  }
+  const wallTextures = wallPalettes.map((_,room)=>[makeWallTexture(room,0),makeWallTexture(room,1)]);
+  const doorTexture = makeDoorTexture(), crateTexture = makeCrateTexture();
+
+  function makeKeySprite() {
+    const c=document.createElement('canvas');c.width=128;c.height=128;const g=c.getContext('2d');
+    g.save();g.shadowColor='rgba(244,196,85,.85)';g.shadowBlur=18;g.strokeStyle='#dfbd71';g.lineWidth=9;g.lineCap='round';
+    g.beginPath();g.arc(38,43,18,0,Math.PI*2);g.stroke();g.beginPath();g.moveTo(52,56);g.lineTo(96,101);g.stroke();
+    g.beginPath();g.moveTo(77,81);g.lineTo(68,91);g.moveTo(88,92);g.lineTo(79,102);g.stroke();g.restore();
+    g.strokeStyle='#f5dc98';g.lineWidth=2;g.beginPath();g.arc(38,43,12,0,Math.PI*2);g.stroke();
+    return c;
+  }
+  function makeMonsterSprite() {
+    const c=document.createElement('canvas');c.width=160;c.height=320;const g=c.getContext('2d');
+    // Soft silhouette halo
+    const halo=g.createRadialGradient(80,154,20,80,154,128);halo.addColorStop(0,'rgba(47,55,55,.31)');halo.addColorStop(1,'rgba(8,9,10,0)');g.fillStyle=halo;g.fillRect(0,0,160,320);
+    const bodyGrad=g.createLinearGradient(36,0,132,0);bodyGrad.addColorStop(0,'#08090a');bodyGrad.addColorStop(.48,'#17191a');bodyGrad.addColorStop(1,'#050607');
+    g.fillStyle=bodyGrad;
+    // Head / hood
+    g.beginPath();g.moveTo(56,24);g.quadraticCurveTo(77,7,99,28);g.lineTo(106,61);g.quadraticCurveTo(92,80,62,69);g.quadraticCurveTo(49,59,56,24);g.fill();
+    g.fillStyle='#08090a';g.beginPath();g.moveTo(48,29);g.quadraticCurveTo(76,0,108,30);g.lineTo(112,57);g.lineTo(99,45);g.lineTo(55,48);g.fill();
+    // Neck and narrow torso
+    g.fillStyle=bodyGrad;g.beginPath();g.moveTo(65,65);g.lineTo(94,64);g.lineTo(111,91);g.lineTo(100,174);g.lineTo(90,205);g.lineTo(55,202);g.lineTo(49,169);g.lineTo(42,94);g.closePath();g.fill();
+    // Long arms, bent and hanging
+    g.beginPath();g.moveTo(49,82);g.lineTo(35,91);g.lineTo(28,142);g.lineTo(19,181);g.lineTo(26,195);g.lineTo(39,179);g.lineTo(49,137);g.lineTo(63,109);g.fill();
+    g.beginPath();g.moveTo(104,82);g.lineTo(119,92);g.lineTo(127,139);g.lineTo(137,174);g.lineTo(130,191);g.lineTo(119,177);g.lineTo(108,139);g.lineTo(96,109);g.fill();
+    // Ragged fingers
+    g.beginPath();g.moveTo(20,181);g.lineTo(17,211);g.lineTo(22,216);g.lineTo(28,196);g.lineTo(30,218);g.lineTo(35,218);g.lineTo(35,192);g.lineTo(40,207);g.lineTo(44,203);g.lineTo(38,179);g.fill();
+    g.beginPath();g.moveTo(132,174);g.lineTo(139,202);g.lineTo(135,210);g.lineTo(127,190);g.lineTo(128,214);g.lineTo(123,215);g.lineTo(119,190);g.lineTo(114,204);g.lineTo(110,199);g.lineTo(119,176);g.fill();
+    // Long, uneven legs
+    g.beginPath();g.moveTo(57,190);g.lineTo(79,195);g.lineTo(73,250);g.lineTo(65,291);g.lineTo(50,297);g.lineTo(53,264);g.lineTo(47,220);g.fill();
+    g.beginPath();g.moveTo(80,195);g.lineTo(101,188);g.lineTo(107,224);g.lineTo(98,268);g.lineTo(111,296);g.lineTo(101,302);g.lineTo(82,280);g.lineTo(83,246);g.fill();
+    g.fillStyle='#050607';g.beginPath();g.moveTo(50,291);g.lineTo(65,289);g.lineTo(68,308);g.lineTo(39,311);g.closePath();g.fill();
+    g.beginPath();g.moveTo(99,293);g.lineTo(111,290);g.lineTo(128,307);g.lineTo(102,309);g.closePath();g.fill();
+    // Sparse cold rim light
+    g.strokeStyle='rgba(132,139,131,.18)';g.lineWidth=2;g.beginPath();g.moveTo(52,37);g.quadraticCurveTo(48,74,42,94);g.lineTo(31,143);g.stroke();
+    // Eyes
+    g.save();g.shadowColor='#ff2d27';g.shadowBlur=12;g.fillStyle='#e54a3d';g.beginPath();g.ellipse(69,46,4,2.7,0,0,Math.PI*2);g.ellipse(90,46,4,2.7,0,0,Math.PI*2);g.fill();g.restore();
+    return c;
+  }
+  const keySprite=makeKeySprite(), monsterSprite=makeMonsterSprite();
+
+  function showToast(text, type='') {
+    ui.toast.textContent=text;ui.toast.className='';
+    if(type) ui.toast.classList.add(type);
+    // Force the entrance transition even when two messages arrive quickly.
+    void ui.toast.offsetWidth;ui.toast.classList.add('show');
+    clearTimeout(toastTimer);toastTimer=setTimeout(()=>ui.toast.classList.remove('show'),2600);
+  }
+
+  function initAudio() {
+    if (!soundOn || audioCtx) { if(audioCtx && audioCtx.state==='suspended') audioCtx.resume(); return; }
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return;
+    try {
+      audioCtx=new AC();masterGain=audioCtx.createGain();masterGain.gain.value=.22;masterGain.connect(audioCtx.destination);
+      const low=audioCtx.createOscillator(),lowGain=audioCtx.createGain();
+      low.type='triangle';low.frequency.value=47;lowGain.gain.value=.18;
+      const filter=audioCtx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=150;
+      low.connect(filter);filter.connect(lowGain);lowGain.connect(masterGain);low.start();
+      const hum=audioCtx.createOscillator(),humGain=audioCtx.createGain();hum.type='sine';hum.frequency.value=54.5;humGain.gain.value=.08;hum.connect(humGain);humGain.connect(masterGain);hum.start();
+      ambientStarted=true;
+    } catch(e) { audioCtx=null; }
+  }
+  function setSound(on) {
+    soundOn=on;
+    if(soundOn&&started) initAudio();
+    if(masterGain&&audioCtx) masterGain.gain.setTargetAtTime(soundOn ? .22 : 0,audioCtx.currentTime,.04);
+    $('soundButton').style.color=soundOn?'#d5d0c6':'#77756e';
+    $('soundButton').setAttribute('aria-label',soundOn?'Mute sound':'Enable sound');
+    $('soundIcon').innerHTML=soundOn
+      ? '<path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 9a4 4 0 0 1 0 6m2.5-8a7.5 7.5 0 0 1 0 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'
+      : '<path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="m17 9 5 6m0-6-5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>';
+  }
+  function tone(freq,duration=.2,wave='sine',volume=.12,endFreq=null) {
+    if(!soundOn||!audioCtx||!masterGain) return;
+    try {
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain(),now=audioCtx.currentTime;
+      o.type=wave;o.frequency.setValueAtTime(freq,now);
+      if(endFreq!==null)o.frequency.exponentialRampToValueAtTime(Math.max(1,endFreq),now+duration);
+      g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(volume,now+.018);g.gain.exponentialRampToValueAtTime(.0001,now+duration);
+      o.connect(g);g.connect(masterGain);o.start(now);o.stop(now+duration+.02);
+    } catch(e) {}
+  }
+  function playPickup(){tone(620,.24,'sine',.12,920);setTimeout(()=>tone(930,.34,'sine',.09,1180),115)}
+  function playCreak(){tone(125,.95,'sawtooth',.12,39)}
+  function playGrowl(){tone(112,.9,'sawtooth',.17,31);setTimeout(()=>tone(57,.62,'triangle',.12,34),85)}
+  function playStun(){tone(460,.18,'triangle',.075,220)}
+  function playHeartbeat(){tone(66,.12,'sine',.1,45);setTimeout(()=>tone(53,.15,'sine',.08,39),155)}
+
+  function updateObjective() {
+    if(!keyFound) ui.objective.textContent='Find the old key';
+    else if(!doorUnlocked) ui.objective.textContent='Return to the front door';
+    else ui.objective.textContent='Walk through the open door';
+    ui.keyCard.classList.toggle('found',keyFound);
+    ui.keyLabel.textContent=keyFound?'KEY FOUND':'KEY MISSING';
+    ui.flashCard.classList.toggle('off',!flashlightOn);
+    ui.flashState.textContent=flashlightOn?'Beam on':'Beam off';
+  }
+  function formatTime(seconds) {
+    const s=Math.max(0,Math.floor(seconds));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  }
+  function setInteract(text,kind='') {
+    if(!text){ui.interact.classList.remove('show','locked');return;}
+    ui.interactText.textContent=text;ui.interact.classList.toggle('locked',kind==='locked');ui.interact.classList.add('show');
+  }
+
+  function currentInteraction() {
+    if(!keyFound) {
+      const kd=distance(player.x,player.y,keyItem.x,keyItem.y);
+      if(kd<1.28 && canSee(player.x,player.y,keyItem.x,keyItem.y)) return {type:'key',label:'Pick up the old key'};
+    }
+    const dd=distance(player.x,player.y,door.x,door.y);
+    if(dd<1.65) {
+      if(!keyFound) return {type:'locked',label:'Locked · find the key'};
+      if(!doorUnlocked) return {type:'door',label:'Unlock the main door'};
+      return {type:'open',label:'The door is open · leave'};
+    }
+    return null;
+  }
+  function interact() {
+    if(!started||paused||terminal)return;
+    const item=currentInteraction();
+    if(!item) return;
+    if(item.type==='key') {
+      keyFound=true;playPickup();showToast('The old key is cold in your hand.');updateObjective();
+      if(monster.active===false) monster.nextSpawnAt=Math.min(monster.nextSpawnAt,elapsed+7);
+    } else if(item.type==='locked') {
+      showToast('Locked tight. The key is somewhere in the house.','alert');playCreak();
+    } else if(item.type==='door') {
+      doorUnlocked=true;playCreak();showToast('The lock turns. The front door groans open.');updateObjective();
+    }
+  }
+
+  function resetRun() {
+    player.x=4.55;player.y=9.5;player.angle=Math.PI;
+    doorUnlocked=false;keyFound=false;keyHintShown=false;flashlightOn=true;stamina=100;staminaDelay=0;
+    elapsed=0;terminal='';paused=false;started=false;nextCreak=13;
+    monster.active=false;monster.x=0;monster.y=0;monster.waypoint=null;monster.spawnAt=0;monster.materializeUntil=0;monster.nextPathAt=0;monster.stunnedUntil=0;monster.wasLit=false;monster.lastStunNotice=-10;monster.nextSpawnAt=13;
+    Object.keys(keysDown).forEach(k=>delete keysDown[k]);touchMove.forward=0;touchMove.strafe=0;
+    updateObjective();ui.timer.textContent='00:00';ui.danger.style.setProperty('--danger',0);document.documentElement.style.setProperty('--danger',0);
+    ui.presence.classList.remove('show');setInteract(null);ui.toast.classList.remove('show');
+  }
+
+  function requestLook() {
+    if(window.matchMedia && window.matchMedia('(pointer:coarse)').matches) return;
+    if(canvas.requestPointerLock) {
+      try { const result=canvas.requestPointerLock(); if(result&&typeof result.catch==='function')result.catch(()=>{}); }
+      catch(e) { fallbackDrag=false; }
+    }
+  }
+  function beginGame() {
+    initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+    started=true;paused=false;terminal='';elapsed=0;monster.nextSpawnAt=13+rand(0,4);nextCreak=10+rand(0,9);
+    ui.title.classList.add('hidden');ui.pause.classList.add('hidden');ui.result.classList.add('hidden');
+    ui.touchControls.classList.add('active');canvas.focus({preventScroll:true});requestLook();updateObjective();
+  }
+  function pauseGame() {
+    if(!started||paused||terminal)return;
+    paused=true;ui.pause.classList.remove('hidden');ui.touchControls.classList.remove('active');
+    if(document.pointerLockElement===canvas)document.exitPointerLock();
+  }
+  function finishGame(result) {
+    if(terminal)return;terminal=result;paused=true;ui.touchControls.classList.remove('active');
+    if(document.pointerLockElement===canvas)document.exitPointerLock();
+    const elapsedText=formatTime(elapsed);
+    if(result==='win') {
+      $('resultKicker').textContent='You made it out';$('resultSymbol').textContent='✦';$('resultTitle').textContent='You escaped';$('resultTitle').className='result-title win';
+      $('resultCopy').textContent='The cold air hits your face. Behind you, the old house goes quiet.';
+      $('resultStats').textContent='Time in the house · '+elapsedText;
+      tone(520,.55,'sine',.1,760);
+    } else {
+      $('resultKicker').textContent='The house keeps its own';$('resultSymbol').textContent='×';$('resultTitle').textContent='Game over';$('resultTitle').className='result-title lose';
+      $('resultCopy').textContent='A shadow closes in. The key is still out there — you can try again.';
+      $('resultStats').textContent='Time survived · '+elapsedText;
+      playGrowl();
+    }
+    ui.result.classList.remove('hidden');
+  }
+
+  function movePlayer(dt) {
+    let forward=(keysDown.KeyW||keysDown.ArrowUp?1:0)-(keysDown.KeyS||keysDown.ArrowDown?1:0)+touchMove.forward;
+    let strafe=(keysDown.KeyD||keysDown.ArrowRight?1:0)-(keysDown.KeyA||keysDown.ArrowLeft?1:0)+touchMove.strafe;
+    const len=Math.hypot(forward,strafe);if(len>1){forward/=len;strafe/=len;}
+    const moving=len>.06;
+    const wantsSprint=(keysDown.ShiftLeft||keysDown.ShiftRight)&&moving&&stamina>1;
+    let speed=wantsSprint?3.65:2.55;
+    if(wantsSprint){stamina=Math.max(0,stamina-31*dt);staminaDelay=.72;}else if(staminaDelay>0){staminaDelay=Math.max(0,staminaDelay-dt);}else{stamina=Math.min(100,stamina+23*dt);}
+    const vx=(Math.cos(player.angle)*forward-Math.sin(player.angle)*strafe)*speed*dt;
+    const vy=(Math.sin(player.angle)*forward+Math.cos(player.angle)*strafe)*speed*dt;
+    if(canStand(player.x+vx,player.y))player.x+=vx;
+    if(canStand(player.x,player.y+vy))player.y+=vy;
+    const pct=Math.round(stamina);ui.staminaFill.style.width=pct+'%';ui.staminaNumber.textContent=pct+'%';
+    ui.staminaFill.style.background=pct<28?'#a9423e':'#c9b982';
+  }
+
+  function findNextStep(sx,sy,tx,ty) {
+    const gx=Math.floor(sx),gy=Math.floor(sy),goalX=Math.floor(tx),goalY=Math.floor(ty);
+    if(gx===goalX&&gy===goalY)return {x:tx,y:ty};
+    const total=MAP_W*MAP_H,start=gy*MAP_W+gx,goal=goalY*MAP_W+goalX;
+    if(gx<0||gy<0||gx>=MAP_W||gy>=MAP_H||goalX<0||goalY<0||goalX>=MAP_W||goalY>=MAP_H)return null;
+    const parent=new Int32Array(total);parent.fill(-1);
+    const queue=new Int16Array(total);let head=0,tail=0;queue[tail++]=start;parent[start]=start;
+    const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+    while(head<tail){
+      const current=queue[head++];if(current===goal)break;
+      const x=current%MAP_W,y=(current/MAP_W)|0;
+      for(const [dx,dy] of dirs){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=MAP_W||ny>=MAP_H)continue;const ni=ny*MAP_W+nx;if(parent[ni]!==-1||tileAt(nx,ny)!==0)continue;parent[ni]=current;queue[tail++]=ni;}
+    }
+    if(parent[goal]===-1)return null;
+    let step=goal;while(parent[step]!==start&&step!==start){step=parent[step];if(parent[step]===-1)return null;}
+    return {x:(step%MAP_W)+.5,y:((step/MAP_W)|0)+.5};
+  }
+  function spawnMonster() {
+    const viable=spawns.filter(s=>distance(player.x,player.y,s.x,s.y)>4.7&&!solidAtWorld(s.x,s.y));
+    if(!viable.length){monster.nextSpawnAt=elapsed+4;return;}
+    const inFront=viable.filter(s=>Math.abs(wrapAngle(Math.atan2(s.y-player.y,s.x-player.x)-player.angle))<.78&&canSee(player.x,player.y,s.x,s.y));
+    const choices=inFront.length&&Math.random()<.7?inFront:viable;
+    const spawn=choices[Math.floor(Math.random()*choices.length)];
+    monster.active=true;monster.x=spawn.x;monster.y=spawn.y;monster.waypoint=null;monster.spawnAt=elapsed;monster.materializeUntil=elapsed+1.35;
+    monster.nextPathAt=0;monster.stunnedUntil=0;monster.wasLit=false;monster.lastStunNotice=-10;
+    showToast('You are not alone.','alert');playGrowl();
+  }
+  function updateMonster(dt) {
+    if(!monster.active&&elapsed>=monster.nextSpawnAt)spawnMonster();
+    if(!monster.active)return;
+    const d=distance(player.x,player.y,monster.x,monster.y);
+    const angleTo=Math.atan2(monster.y-player.y,monster.x-player.x);
+    const inBeam=flashlightOn&&d<6.5&&Math.abs(wrapAngle(angleTo-player.angle))<.31&&canSee(player.x,player.y,monster.x,monster.y);
+    if(inBeam){
+      monster.stunnedUntil=elapsed+.22;
+      if(!monster.wasLit&&elapsed-monster.lastStunNotice>1.0){showToast('The light holds it back. Run.','alert');playStun();monster.lastStunNotice=elapsed;}
+    }
+    monster.wasLit=inBeam;
+    const stunned=elapsed<monster.stunnedUntil;
+    if(!stunned&&elapsed>=monster.materializeUntil){
+      if(elapsed>=monster.nextPathAt||!monster.waypoint){
+        monster.waypoint=findNextStep(monster.x,monster.y,player.x,player.y);
+        monster.nextPathAt=elapsed+.36;
+      }
+      if(monster.waypoint){
+        let dx=monster.waypoint.x-monster.x,dy=monster.waypoint.y-monster.y;
+        let step=Math.hypot(dx,dy);
+        if(step<.075){monster.nextPathAt=0;}
+        else {
+          const speed=keyFound?1.55:1.35,move=Math.min(step,speed*dt);
+          const nx=monster.x+dx/step*move,ny=monster.y+dy/step*move;
+          if(canStand(nx,monster.y,.15))monster.x=nx;
+          if(canStand(monster.x,ny,.15))monster.y=ny;
+        }
+      }
+    }
+    if(d<.48&&!stunned&&elapsed>=monster.materializeUntil){finishGame('lose');return;}
+    if(elapsed-monster.spawnAt>27&&d>9.5){
+      monster.active=false;monster.nextSpawnAt=elapsed+rand(13,20);monster.waypoint=null;
+      showToast('The house falls silent again.');
+    }
+  }
+
+  function update(dt) {
+    elapsed+=dt;movePlayer(dt);updateMonster(dt);
+    if(!keyFound&&!keyHintShown&&elapsed>22){keyHintShown=true;showToast('A faint metallic glint flickers in a back room.');}
+    if(elapsed>=nextCreak){if(Math.random()<.72){playCreak();showToast('The house creaks around you.');}nextCreak=elapsed+rand(12,23);}
+    const interaction=currentInteraction();
+    if(interaction)setInteract(interaction.label,interaction.type==='locked'?'locked':'');else setInteract(null);
+    if(doorUnlocked&&player.x<-.08&&Math.floor(player.y)===9){finishGame('win');return;}
+    const d=monster.active?distance(player.x,player.y,monster.x,monster.y):99;
+    const danger=monster.active?clamp((6.7-d)/6.7,0,.72):0;
+    document.documentElement.style.setProperty('--danger',danger.toFixed(2));
+    ui.presence.classList.toggle('show',monster.active&&d<10);
+    ui.presence.textContent=d<3.5?'It is right behind you':'Something is roaming';
+    ui.timer.textContent=formatTime(elapsed);
+  }
+
+  const rayData = new Array(W);
+  function renderFloor() {
+    const ca=Math.cos(player.angle),sa=Math.sin(player.angle),time=performance.now();
+    const flashPulse=.96+.025*Math.sin(time*.013)+.015*Math.sin(time*.041);
+    const directions=new Array(FLOOR_W);
+    for(let x=0;x<FLOOR_W;x++){
+      const camX=(((x+.5)/FLOOR_W)*2-1)*TAN_HALF;
+      const vx=ca-sa*camX,vy=sa+ca*camX,len=Math.hypot(vx,vy),a=Math.atan2(vy,vx);
+      directions[x]={vx,vy,len,delta:wrapAngle(a-player.angle)};
+    }
+    for(let y=0;y<H;y++){
+      const p=Math.abs((H*.5)-y);
+      if(p<.65){const row=y*FLOOR_W*4;for(let x=0;x<FLOOR_W;x++){pixels[row+x*4]=8;pixels[row+x*4+1]=9;pixels[row+x*4+2]=9;pixels[row+x*4+3]=255;}continue;}
+      const rowDist=.5*FOCAL/p;
+      const ceiling=y<H*.5;
+      const baseAmbient = ceiling ? .105 : .16;
+      for(let x=0;x<FLOOR_W;x++){
+        const r=directions[x],wx=player.x+r.vx*rowDist,wy=player.y+r.vy*rowDist;
+        const gx=Math.floor(wx),gy=Math.floor(wy),inside=gx>=0&&gy>=0&&gx<MAP_W&&gy<MAP_H;
+        const room=roomAt(wx,wy),base=ceiling?roomCeiling[room]:roomFloor[room];
+        const dist=rowDist*r.len;
+        let beam=0;
+        if(flashlightOn){beam=Math.max(0,1-Math.abs(r.delta)/.57);beam=beam*beam*(3-2*beam);}
+        let light=baseAmbient+(flashlightOn ? .83*flashPulse*beam/(1+dist*.12) : 0);
+        if(ceiling)light*=.67;
+        if(!inside)light*=.42;
+        const n=inside?tileNoise[gy*MAP_W+gx]:.88;
+        const fy=wy-Math.floor(wy),fx=wx-Math.floor(wx);
+        let grain=n*(.93+.07*(((gx*17+gy*31+room*11)&7)/7));
+        if(!ceiling){
+          if(fy<.035||fy>.965)grain*=.56;
+          if(((gx+gy)&1)===0&&fx<.035)grain*=.78;
+          // Slightly darker, irregular wear around the outer edges of each plank.
+          grain*=.92+.08*(1-Math.abs(fx-.5)*2);
+        }else{
+          if(fy<.045||fy>.955)grain*=.72;
+          if(fx<.025)grain*=.76;
+        }
+        const idx=(y*FLOOR_W+x)*4;
+        pixels[idx]=clamp(base[0]*light*grain,0,255);
+        pixels[idx+1]=clamp(base[1]*light*grain,0,255);
+        pixels[idx+2]=clamp(base[2]*light*grain,0,255);
+        pixels[idx+3]=255;
+      }
+    }
+    floorCtx.putImageData(floorImage,0,0);
+    ctx.imageSmoothingEnabled=true;ctx.drawImage(floorCanvas,0,0,W,H);
+  }
+
+  function drawWalls() {
+    const ca=Math.cos(player.angle),sa=Math.sin(player.angle);
+    for(let x=0;x<W;x++){
+      const camX=(((x+.5)/W)*2-1)*TAN_HALF;
+      const vx=ca-sa*camX,vy=sa+ca*camX,rayLen=Math.hypot(vx,vy),dx=vx/rayLen,dy=vy/rayLen;
+      let mx=Math.floor(player.x),my=Math.floor(player.y);
+      const deltaX=dx===0?1e30:Math.abs(1/dx),deltaY=dy===0?1e30:Math.abs(1/dy);
+      const stepX=dx<0?-1:1,stepY=dy<0?-1:1;
+      let sideX=dx<0?(player.x-mx)*deltaX:(mx+1-player.x)*deltaX;
+      let sideY=dy<0?(player.y-my)*deltaY:(my+1-player.y)*deltaY;
+      let side=0,tile=WALL,dist=24;
+      for(let i=0;i<72;i++){
+        if(sideX<sideY){sideX+=deltaX;mx+=stepX;side=0;}else{sideY+=deltaY;my+=stepY;side=1;}
+        tile=tileAt(mx,my);
+        if(tile!==0){dist=side===0?sideX-deltaX:sideY-deltaY;break;}
+      }
+      const depth=Math.max(.035,dist/rayLen),lineH=Math.min(H*20,FOCAL/depth);
+      const bottom=H*.5+FOCAL*.5/depth;
+      const height=tile===CRATE?FOCAL*.76/depth:lineH;
+      const top=bottom-height;
+      let hitU=side===0?player.y+dist*dy:player.x+dist*dx;hitU-=Math.floor(hitU);
+      if((side===0&&dx>0)||(side===1&&dy<0))hitU=1-hitU;
+      let tex;
+      if(tile===MAIN_DOOR)tex=doorTexture;
+      else if(tile===CRATE)tex=crateTexture;
+      else {const room=roomAt(mx,my),variant=((mx*3+my*7)&1);tex=wallTextures[room][variant];}
+      const sourceX=clamp(Math.floor(hitU*tex.width),0,tex.width-1);
+      let delta=wrapAngle(Math.atan2(dy,dx)-player.angle);
+      let beam=flashlightOn?Math.max(0,1-Math.abs(delta)/.57):0;beam=beam*beam*(3-2*beam);
+      let light=.13+(flashlightOn ? .88*beam/(1+depth*.12) : 0);
+      if(side===1)light*=.79;
+      if(depth>7)light*=1-clamp((depth-7)/17,0,.72);
+      rayData[x]=depth;
+      ctx.drawImage(tex,sourceX,0,1,tex.height,x,top,1.15,height);
+      const shade=clamp(1-light,.12,.94);
+      ctx.fillStyle=`rgba(0,0,0,${shade})`;ctx.fillRect(x,top,1.2,height);
+      // Soft timber rails stay visible in the flashlight beam.
+      if(tile!==MAIN_DOOR&&tile!==CRATE&&height>22){
+        ctx.fillStyle=`rgba(0,0,0,${clamp(.26*light,.025,.18)})`;
+        ctx.fillRect(x,top+height*.73,1.2,Math.max(1,height*.012));
+      }
+    }
+  }
+
+  function projected(obj,worldHeight,worldWidth) {
+    const dx=obj.x-player.x,dy=obj.y-player.y,d=Math.hypot(dx,dy);
+    const rel=wrapAngle(Math.atan2(dy,dx)-player.angle),depth=d*Math.cos(rel);
+    if(depth<=.05||Math.abs(rel)>FOV*.62)return null;
+    const sx=W*.5+Math.tan(rel)*FOCAL;
+    if(sx<-80||sx>W+80)return null;
+    const ix=clamp(Math.floor(sx),0,W-1);
+    if(depth>rayData[ix]+.16)return null;
+    const bottom=H*.5+FOCAL*.5/depth;
+    return {sx,depth,bottom,sh:FOCAL*worldHeight/depth,sw:FOCAL*worldWidth/depth,rel,d};
+  }
+  function drawKey(time) {
+    if(keyFound)return;
+    const p=projected(keyItem,.19,.2);if(!p)return;
+    const bob=Math.sin(time*.0024)*2.4,ground=p.bottom-FOCAL*.045/p.depth+bob;
+    const glow=ctx.createRadialGradient(p.sx,ground,1,p.sx,ground,Math.max(12,p.sw*2.6));
+    glow.addColorStop(0,'rgba(224,183,91,.23)');glow.addColorStop(1,'rgba(203,155,54,0)');
+    ctx.fillStyle=glow;ctx.beginPath();ctx.ellipse(p.sx,ground,Math.max(12,p.sw*2.6),Math.max(5,p.sh*1.25),0,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=.92;ctx.drawImage(keySprite,p.sx-p.sw*.65,ground-p.sh*.62,p.sw*1.3,p.sh*1.3);ctx.globalAlpha=1;
+  }
+  function drawMonster(time) {
+    if(!monster.active)return;
+    const p=projected(monster,1.28,.59);if(!p)return;
+    const appearing=elapsed<monster.materializeUntil,stunned=elapsed<monster.stunnedUntil;
+    const fade=appearing?clamp((elapsed-monster.spawnAt)/.8,0,1):1;
+    const sway=Math.sin(time*.0019)*Math.min(5,p.sw*.07);
+    const top=p.bottom-p.sh;
+    ctx.save();ctx.globalAlpha=(stunned?.93:.88)*fade;
+    if(stunned){
+      const halo=ctx.createRadialGradient(p.sx,top+p.sh*.48,2,p.sx,top+p.sh*.48,p.sw*1.5);
+      halo.addColorStop(0,'rgba(147,202,204,.34)');halo.addColorStop(1,'rgba(103,161,168,0)');
+      ctx.fillStyle=halo;ctx.beginPath();ctx.ellipse(p.sx,top+p.sh*.48,p.sw*1.5,p.sh*.58,0,0,Math.PI*2);ctx.fill();
+    }
+    ctx.drawImage(monsterSprite,p.sx-p.sw*.5+sway,top,p.sw,p.sh);
+    ctx.restore();
+  }
+  function drawSprites(time) {
+    drawKey(time);
+    drawMonster(time);
+  }
+  function render(time) {
+    renderFloor();drawWalls();drawSprites(time);
+  }
+
+  function startFresh() {
+    resetRun();ui.title.classList.add('hidden');beginGame();
+  }
+  $('startButton').addEventListener('click',()=>beginGame());
+  $('resumeButton').addEventListener('click',()=>{
+    paused=false;ui.pause.classList.add('hidden');ui.touchControls.classList.add('active');requestLook();
+  });
+  $('retryButton').addEventListener('click',startFresh);
+  $('soundButton').addEventListener('click',()=>setSound(!soundOn));
+  $('touchFlash').addEventListener('click',()=>{if(started&&!paused){flashlightOn=!flashlightOn;updateObjective();tone(flashlightOn?360:180,.09,'sine',.055)}});
+  $('touchUse').addEventListener('click',interact);
+
+  window.addEventListener('keydown',(e)=>{
+    if(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
+    if(e.code==='Escape'&&started&&!terminal){e.preventDefault();pauseGame();return;}
+    if(!started||paused||terminal)return;
+    keysDown[e.code]=true;
+    if(e.repeat)return;
+    if(e.code==='KeyE')interact();
+    if(e.code==='KeyF'){flashlightOn=!flashlightOn;updateObjective();tone(flashlightOn?360:180,.09,'sine',.055)}
+  },{passive:false});
+  window.addEventListener('keyup',(e)=>{keysDown[e.code]=false});
+  window.addEventListener('blur',()=>{if(started&&!paused&&!terminal)pauseGame()});
+  document.addEventListener('pointerlockchange',()=>{
+    pointerLocked=document.pointerLockElement===canvas;
+    if(pointerLocked){everPointerLocked=true;fallbackDrag=false;}
+    else if(everPointerLocked&&started&&!paused&&!terminal)pauseGame();
+  });
+  document.addEventListener('pointerlockerror',()=>{fallbackDrag=false;});
+  canvas.addEventListener('pointerdown',(e)=>{
+    if(!started||paused||terminal)return;
+    if(e.pointerType==='touch'){
+      if(e.clientX>window.innerWidth*.3){touchLookId=e.pointerId;touchLookX=e.clientX;try{canvas.setPointerCapture(e.pointerId)}catch(err){}}
+    }else if(!pointerLocked){fallbackDrag=true;lastMouseX=e.clientX;try{canvas.setPointerCapture(e.pointerId)}catch(err){}}
+  });
+  window.addEventListener('pointermove',(e)=>{
+    if(pointerLocked){player.angle=wrapAngle(player.angle+e.movementX*.0026);return;}
+    if(fallbackDrag&&e.pointerType!=='touch'){player.angle=wrapAngle(player.angle+(e.clientX-lastMouseX)*.0032);lastMouseX=e.clientX;}
+    if(touchLookId===e.pointerId){player.angle=wrapAngle(player.angle+(e.clientX-touchLookX)*.006);touchLookX=e.clientX;}
+  });
+  window.addEventListener('pointerup',(e)=>{if(e.pointerId===touchLookId)touchLookId=null;if(e.pointerType!=='touch')fallbackDrag=false;});
+  window.addEventListener('pointercancel',(e)=>{if(e.pointerId===touchLookId)touchLookId=null;fallbackDrag=false;});
+
+  // A small virtual stick and look-by-drag make the same build usable on touch screens.
+  const touchPad=$('touchPad'),thumb=$('thumb');let padPointer=null,padRect=null;
+  function updateTouchPad(e){
+    if(padPointer!==e.pointerId)return;
+    const dx=e.clientX-(padRect.left+padRect.width/2),dy=e.clientY-(padRect.top+padRect.height/2),max=37,len=Math.hypot(dx,dy),scale=len>max?max/len:1;
+    const nx=dx*scale,ny=dy*scale;thumb.style.transform=`translate(${nx}px,${ny}px)`;
+    touchMove.strafe=nx/max;touchMove.forward=-ny/max;
+  }
+  touchPad.addEventListener('pointerdown',(e)=>{if(!started||paused)return;e.preventDefault();e.stopPropagation();padPointer=e.pointerId;padRect=touchPad.getBoundingClientRect();try{touchPad.setPointerCapture(e.pointerId)}catch(err){}updateTouchPad(e)});
+  touchPad.addEventListener('pointermove',(e)=>{if(padPointer===e.pointerId){e.preventDefault();updateTouchPad(e)}});
+  function releasePad(e){if(padPointer===e.pointerId){padPointer=null;touchMove.forward=0;touchMove.strafe=0;thumb.style.transform='translate(0,0)'}}
+  touchPad.addEventListener('pointerup',releasePad);touchPad.addEventListener('pointercancel',releasePad);
+
+  setSound(true);updateObjective();
+  function frame(now){
+    const dt=lastFrame?Math.min(.045,(now-lastFrame)/1000):0;lastFrame=now;
+    if(started&&!paused&&!terminal)update(dt);
+    render(now);requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
